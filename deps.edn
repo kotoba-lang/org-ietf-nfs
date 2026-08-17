@@ -2,8 +2,10 @@
  ;; The envelope and the codec. No transport dependency: nfs.tcp is a :clj
  ;; namespace that owns a socket and nothing else, and a different host can
  ;; replace it without touching a byte of protocol.
- :deps {io.github.kotoba-lang/org-ietf-oncrpc {:local/root "../oncrpc"}
-        io.github.kotoba-lang/org-ietf-xdr {:local/root "../xdr"}}
+ :deps {io.github.kotoba-lang/org-ietf-oncrpc {:git/url "https://github.com/kotoba-lang/org-ietf-oncrpc.git"
+         :git/sha "d8f4a83c86473a49d5f097cbcf4bbe677c1112d1"}
+        io.github.kotoba-lang/org-ietf-xdr {:git/url "https://github.com/kotoba-lang/org-ietf-xdr.git"
+         :git/sha "53bceaa35ef42fb07cfad911189c8c94e3f4f1b9"}}
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps {io.github.cognitect-labs/test-runner
