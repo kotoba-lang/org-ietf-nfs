@@ -179,3 +179,49 @@
                                                   {:dir root :name "absent"}))
             res (xdr/decode-value nfs/lookup-res bytes at)]
         (is (= nfs/NFS3ERR_NOENT (:disc res)))))))
+
+;; ── who is allowed, and as whom ───────────────────────────────────────────
+
+(deftest a-refused-peer-never-gets-a-reply
+  (testing "NFSv3 has no authentication of its own, so the decision has to be
+            made before the protocol starts — and a refusal at accept is the
+            one place where closing beats replying, because there is no call
+            yet to answer"
+    (let [server (tcp/start! {:fs (memory/filesystem)
+                              :dir "/kotoba" :port 0
+                              :authorize (constantly nil)})]
+      (try
+        (is (thrown? Exception
+                     (with-open [socket (Socket. "127.0.0.1" (int (:port server)))]
+                       (call! socket mount/program 3 0 nil))))
+        (finally ((:stop! server)))))))
+
+(deftest an-authorized-peer-is-served-its-own-filesystem
+  (testing ":filesystem-for is what makes one listener serve a per-user tree
+            without the identity being re-derived on every call"
+    (let [seen (atom [])
+          alice (memory/filesystem)
+          _ (nfs/-create alice (nfs/-root alice) "alice-only.txt" {})
+          server (tcp/start! {:filesystem-for (fn [p] (swap! seen conj p) alice)
+                              :dir "/kotoba" :port 0
+                              :authorize (fn [peer]
+                                           (when (= "127.0.0.1" (:remote-address peer))
+                                             {:principal "alice"}))})]
+      (try
+        (with-open [socket (Socket. "127.0.0.1" (int (:port server)))]
+          (let [{:keys [bytes at]} (call! socket mount/program 3 1
+                                          (xdr/encode mount/dirpath "/kotoba"))
+                res (xdr/decode-value mount/mount-res bytes at)
+                root (get-in res [:value :handle])]
+            (is (= mount/MNT3_OK (:disc res)))
+            (let [{:keys [bytes at]} (call! socket nfs/program 3 3
+                                            (xdr/encode nfs/diropargs3
+                                                        {:dir root :name "alice-only.txt"}))
+                  res (xdr/decode-value nfs/lookup-res bytes at)]
+              (is (= nfs/NFS3_OK (:disc res))))))
+        (is (= [{:principal "alice"}] @seen)
+            "the principal is decided once, at accept")
+        (finally ((:stop! server)))))))
+
+(deftest a-listener-with-no-filesystem-is-refused-at-construction
+  (is (thrown? clojure.lang.ExceptionInfo (tcp/start! {:dir "/x" :port 0}))))

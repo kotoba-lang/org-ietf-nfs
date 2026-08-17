@@ -43,6 +43,29 @@ portmapper (program 100000 would have to bind port 111, which needs root).
 The command-line mount carries the ports explicitly and so needs no
 portmapper.
 
+## Who is allowed, and as whom
+
+NFSv3 has no authentication. `AUTH_SYS` carries a uid and gid the *client*
+chose, which makes it a hint and never a boundary. Two optional seams answer
+that here, and neither knows what supplies them:
+
+```clojure
+(tcp/start!
+ {:dir "/kotoba" :port 12049
+  :authorize      (fn [peer] principal-or-nil)   ; once, at accept
+  :filesystem-for (fn [principal] fs)})          ; a tree per principal
+```
+
+`nil` from `:authorize` closes the connection before a byte is read — the one
+place where closing beats replying, because there is no RPC call yet to
+answer. With neither seam supplied the server is open to anything that
+reaches the socket, which is why the default bind is loopback.
+
+`kotoba-lang/kekkai` is the intended supplier: `kekkai.acl/edge-allowed?` is
+pure, deny-by-default and port-granular, and returns the ports one node may
+reach another on. This repository deliberately does not depend on it —
+whoever depends on both is the application.
+
 ## The filesystem is injected
 
 `nfs.v3/IFilesystem` is the whole seam: root, attrs, lookup, readdir, read,
