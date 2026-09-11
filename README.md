@@ -105,7 +105,7 @@ the portmapper, NFSv4, RPCSEC_GSS.
 ## Test
 
 ```bash
-clojure -M:test
+kbb -M:test
 ```
 
 The round-trip suite starts a real listener and drives it with a client of
